@@ -109,6 +109,77 @@ If your project already uses a different wallet-connection stack
 are the only two files that talk to Reown AppKit directly - swap those two
 for your own equivalents and the panel itself doesn't need to change.
 
+## TBA Compliance Checker (`/checker`)
+
+A second, self-contained tool in this repo: paste an NFT contract address,
+token ID, and chain, and get a factual report on whether that token's
+ERC-6551 Token Bound Account setup uses Tokenbound's canonical reference
+implementation or a custom one.
+
+**Why this exists.** TBA deployment is always permissionless and free
+(gas-only) through the single canonical ERC-6551 registry
+(`0x000000006551c19487814612e58FE06813775758`, identical on every EVM
+chain) - anyone can call `createAccount()` for any token at any time, no
+project's permission required. But a project can deploy its own custom
+implementation contract with extra logic in `execute()` (e.g. requiring a
+payment before sends work), which is where "activate your wallet" confusion
+comes from. This tool answers, mechanically and without guessing:
+
+1. What address would the canonical setup produce for this token?
+2. Has an account actually been created for it yet, and with which
+   implementation (discovered directly from the registry's
+   `ERC6551AccountCreated` event - no user input required to find this)?
+3. Does that implementation match Tokenbound's known canonical bytecode?
+4. Is its source verified on a block explorer, and if so, what functions
+   does it expose beyond the standard `execute`/`isValidSigner`/`token`/
+   `state`/`supportsInterface` interface?
+5. Optionally, a plain-English summary of the above from an AI provider you
+   bring your own key for (Anthropic, OpenAI, or any OpenAI-compatible
+   endpoint) - purely factual, no "this is safe/unsafe"-style language, and
+   fully optional (the report works completely without it).
+
+Every finding is reported in neutral, factual language - no
+"warning"/"red flag"/"scam" wording anywhere in the UI or generated text.
+This is fact-gathering to help you DYOR, not a verdict.
+
+**Chains supported:** Ethereum mainnet, Base (both via Etherscan's unified
+V2 API), and Robinhood Chain (via its Blockscout explorer, no API key
+needed).
+
+**Setup:** works out of the box for Robinhood Chain. For verified-source
+checks on Ethereum mainnet / Base, add one more variable to `.env.local`:
+
+```bash
+ETHERSCAN_API_KEY=your-etherscan-api-key
+```
+
+(Free at [etherscan.io/apis](https://etherscan.io/apis) - Etherscan's V2 API
+now covers Base too, so one key works for both chains. Without it, those two
+chains still work for every check except verified-source/extra-functions,
+which report plainly that no explorer key is configured, rather than
+guessing.)
+
+**Module layout** (self-contained, meant to be liftable onto another
+site/subdomain wholesale):
+
+- `lib/complianceCheck.ts` - all mechanical checks: canonical address
+  computation, on-chain `ERC6551AccountCreated` log discovery, bytecode
+  diffing against known reference hashes, explorer source/ABI checks.
+- `lib/aiProviders.ts` - the multi-provider AI abstraction (Anthropic /
+  OpenAI / custom OpenAI-compatible).
+- `app/api/checker/analyze/route.ts` - server route running the mechanical
+  checks (keeps `ETHERSCAN_API_KEY` server-side).
+- `app/api/checker/ai-explain/route.ts` - same-request passthrough for the
+  optional AI call; your key is used once for that single request and is
+  never logged or persisted.
+- `components/ComplianceChecker/` - the form + report UI.
+- `app/checker/page.tsx` - the route (`/checker`).
+
+None of the above imports anything from `lib/config.ts`,
+`components/TbaWalletPanel.tsx`, or the rest of this repo's
+single-collection env config - it takes chain/contract/token as direct user
+input instead.
+
 ## License
 
 MIT - see [LICENSE](LICENSE).
