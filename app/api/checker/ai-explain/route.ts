@@ -5,9 +5,19 @@ import {
   type AiProviderKind,
 } from "@/lib/aiProviders";
 
-// Same-request passthrough for the optional AI explanation layer. The
-// caller's API key travels in this one request body, is used exactly once
-// to call the chosen provider, and is discarded when this function returns.
+// Same-request passthrough for the optional AI explanation layer - OpenAI
+// and custom OpenAI-compatible endpoints only. The caller's API key travels
+// in this one request body, is used exactly once to call the chosen
+// provider, and is discarded when this function returns.
+//
+// Anthropic is NOT handled here. Anthropic's API supports genuine CORS from
+// the browser (see lib/aiProviders.ts's module comment and
+// explainFindingsAnthropicDirect), so the client calls api.anthropic.com
+// directly and this route is never invoked for that provider - not "invoked
+// but relabeled," genuinely skipped. OpenAI's API does not support direct
+// browser requests (no CORS headers on their side, nothing we can work
+// around client-side), and arbitrary custom endpoints are unknown per-server,
+// so both still need this server-side relay.
 //
 // IMPORTANT: never add logging of `body`, `apiKey`, or `findings` here (no
 // console.log/console.error on the raw request) - that's the whole point of
@@ -24,7 +34,8 @@ interface AiExplainRequestBody {
   findings?: unknown;
 }
 
-const VALID_PROVIDERS: AiProviderKind[] = ["anthropic", "openai", "custom"];
+// Anthropic is deliberately excluded - see the module comment above.
+const VALID_PROVIDERS: AiProviderKind[] = ["openai", "custom"];
 
 export async function POST(request: NextRequest) {
   let body: AiExplainRequestBody;
@@ -50,11 +61,24 @@ export async function POST(request: NextRequest) {
   if (!provider) {
     provider = detectProviderKind(apiKey) ?? undefined;
   }
+  if (provider === "anthropic") {
+    // Should never happen in normal use - the UI calls Anthropic directly
+    // from the browser and never reaches this route for that provider. If a
+    // client somehow lands here anyway, fail loudly rather than silently
+    // relaying an Anthropic key through the server.
+    return NextResponse.json(
+      {
+        error:
+          "Anthropic requests are made directly from the browser and do not go through this endpoint.",
+      },
+      { status: 400 },
+    );
+  }
   if (!provider || !VALID_PROVIDERS.includes(provider)) {
     return NextResponse.json(
       {
         error:
-          "Could not determine AI provider from the key - pick one explicitly (anthropic, openai, or custom).",
+          "Could not determine AI provider from the key - pick one explicitly (openai or custom).",
       },
       { status: 400 },
     );

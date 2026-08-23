@@ -6,12 +6,29 @@
 // supplies a key. Self-contained (no imports from the rest of this repo) so
 // this module lifts out cleanly with the rest of ComplianceChecker.
 //
-// Key handling: the key is read from the request body of a single POST to
-// app/api/checker/ai-explain/route.ts, used exactly once to call the chosen
-// provider, and then discarded when that request's handler returns. It is
-// never logged (see the route handler - no console.log of the request body
-// or the key), never written to a database, and never included in the
-// response payload sent back to the browser.
+// This file is imported from both a client component (ComplianceChecker.tsx)
+// and a server route (app/api/checker/ai-explain/route.ts) - it has no
+// Node-only imports so it works in both environments.
+//
+// Call path differs by provider, and that's a deliberate choice, not an
+// accident:
+//   - Anthropic's API supports genuine CORS from the browser via the
+//     `anthropic-dangerous-direct-browser-access` header (confirmed current
+//     as of this writing - see callAnthropic below). For that provider the
+//     key and request go straight from the browser to api.anthropic.com;
+//     this app's server is never in the request path at all.
+//   - OpenAI's API does not send CORS headers for browser-origin requests -
+//     there is no client-side workaround for that, it's enforced on their
+//     server. Custom OpenAI-compatible endpoints are unknown per-server, so
+//     they're treated the same (server passthrough) rather than assumed to
+//     support direct browser calls.
+//
+// For the two non-Anthropic cases, the key is read from the request body of
+// a single POST to app/api/checker/ai-explain/route.ts, used exactly once to
+// call the chosen provider, and then discarded when that request's handler
+// returns. It is never logged (see the route handler - no console.log of the
+// request body or the key), never written to a database, and never included
+// in the response payload sent back to the browser.
 
 export type AiProviderKind = "anthropic" | "openai" | "custom";
 
@@ -69,18 +86,24 @@ export interface ExplainFindingsResult {
   modelUsed: string;
 }
 
+/**
+ * Server-side dispatcher. Only handles providers that structurally require a
+ * server passthrough (OpenAI, and custom OpenAI-compatible endpoints, which
+ * are treated the same since browser CORS support there is unknown per
+ * server). Anthropic is NOT handled here - it never touches this app's
+ * server at all. See explainFindingsAnthropicDirect below, which is called
+ * directly from the browser instead. Passing "anthropic" here is a
+ * programming error (the UI should never route it through this function) -
+ * it throws rather than silently falling back to a server call.
+ */
 export async function explainFindings(
   config: AiProviderConfig,
   findingsJson: unknown,
 ): Promise<ExplainFindingsResult> {
   const model = config.model?.trim() || DEFAULT_MODELS[config.kind];
-  const userPrompt = `Mechanical findings (JSON):\n${JSON.stringify(findingsJson, null, 2)}\n\nExplain what this code mechanically does, following the rules above.`;
+  const userPrompt = buildUserPrompt(findingsJson);
 
   switch (config.kind) {
-    case "anthropic": {
-      const text = await callAnthropic(config.apiKey, model, userPrompt);
-      return { explanation: text, providerUsed: "anthropic", modelUsed: model };
-    }
     case "openai": {
       const text = await callOpenAiCompatible(
         "https://api.openai.com/v1",
@@ -103,12 +126,46 @@ export async function explainFindings(
       );
       return { explanation: text, providerUsed: "custom", modelUsed: model };
     }
+    case "anthropic":
+      throw new Error(
+        "Anthropic calls go directly from the browser and should never reach this server-side function - see explainFindingsAnthropicDirect.",
+      );
     default:
       throw new Error(`Unknown provider: ${config.kind}`);
   }
 }
 
+function buildUserPrompt(findingsJson: unknown): string {
+  return `Mechanical findings (JSON):\n${JSON.stringify(findingsJson, null, 2)}\n\nExplain what this code mechanically does, following the rules above.`;
+}
+
 const FETCH_TIMEOUT_MS = 30_000;
+
+/**
+ * Client-side call, meant to be invoked directly from the browser (see
+ * ComplianceChecker.tsx) - never from the server route. Anthropic's API
+ * supports genuine CORS for browser-origin requests via the
+ * `anthropic-dangerous-direct-browser-access` header; without it a
+ * cross-origin browser request is rejected with an authentication_error
+ * asking for the header. This is not a proxy or passthrough of any kind -
+ * the fetch below goes straight from the user's browser to
+ * api.anthropic.com, and this app's server never sees the key or the
+ * request/response bodies.
+ */
+export async function explainFindingsAnthropicDirect(
+  apiKey: string,
+  findingsJson: unknown,
+  model?: string,
+): Promise<ExplainFindingsResult> {
+  const resolvedModel = model?.trim() || DEFAULT_MODELS.anthropic;
+  const userPrompt = buildUserPrompt(findingsJson);
+  const text = await callAnthropic(apiKey, resolvedModel, userPrompt);
+  return {
+    explanation: text,
+    providerUsed: "anthropic",
+    modelUsed: resolvedModel,
+  };
+}
 
 async function callAnthropic(
   apiKey: string,
@@ -121,6 +178,10 @@ async function callAnthropic(
       "content-type": "application/json",
       "x-api-key": apiKey,
       "anthropic-version": "2023-06-01",
+      // Required for Anthropic to accept a cross-origin browser request at
+      // all - see the module-level comment above for why this call is
+      // structured this way.
+      "anthropic-dangerous-direct-browser-access": "true",
     },
     body: JSON.stringify({
       model,

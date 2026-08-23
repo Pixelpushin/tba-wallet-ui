@@ -2,7 +2,10 @@
 
 import { useState } from "react";
 import type { ChainKey, ComplianceReport } from "@/lib/complianceCheck";
-import type { AiProviderKind } from "@/lib/aiProviders";
+import {
+  explainFindingsAnthropicDirect,
+  type AiProviderKind,
+} from "@/lib/aiProviders";
 import { ComplianceReportView } from "./ComplianceReportView";
 
 // Self-contained "TBA Compliance Checker" tool. Deliberately NOT wired into
@@ -72,21 +75,36 @@ export function ComplianceChecker() {
 
       if (aiApiKey.trim()) {
         try {
-          const aiRes = await fetch("/api/checker/ai-explain", {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({
-              provider: aiProvider,
-              apiKey: aiApiKey,
-              baseUrl: aiBaseUrl || undefined,
-              findings: nextReport,
-            }),
-          });
-          const aiBody = await aiRes.json();
-          if (!aiRes.ok) {
-            throw new Error(aiBody.error ?? "AI explanation failed.");
+          if (aiProvider === "anthropic") {
+            // Called directly from the browser - api.anthropic.com only,
+            // this app's server is never involved for this provider. See
+            // lib/aiProviders.ts for why Anthropic and OpenAI/custom take
+            // different paths.
+            const result = await explainFindingsAnthropicDirect(
+              aiApiKey,
+              nextReport,
+            );
+            setAiExplanation(result.explanation);
+          } else {
+            // OpenAI and custom endpoints don't support direct browser
+            // requests, so this one request is relayed through this app's
+            // server (never logged or stored - see the route handler).
+            const aiRes = await fetch("/api/checker/ai-explain", {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({
+                provider: aiProvider,
+                apiKey: aiApiKey,
+                baseUrl: aiBaseUrl || undefined,
+                findings: nextReport,
+              }),
+            });
+            const aiBody = await aiRes.json();
+            if (!aiRes.ok) {
+              throw new Error(aiBody.error ?? "AI explanation failed.");
+            }
+            setAiExplanation(aiBody.explanation);
           }
-          setAiExplanation(aiBody.explanation);
         } catch (aiErr) {
           setAiError(
             aiErr instanceof Error ? aiErr.message : "AI explanation failed.",
@@ -207,12 +225,33 @@ export function ComplianceChecker() {
           </summary>
           <div className="mt-3 space-y-3">
             <p className="text-xs opacity-70">
-              Your key is sent directly to this server for this single request
-              only, used to call the AI provider you choose, and is never stored
-              or logged. Leave this blank and the report still works fully - you
-              just get the raw mechanical findings above without the
-              plain-English paragraph.
+              Leave this blank and the report still works fully - you just get
+              the raw mechanical findings above without the plain-English
+              paragraph.
             </p>
+            <p className="text-xs opacity-70">
+              We built the most private path each provider actually allows.
+            </p>
+            {aiProvider === "anthropic" ? (
+              <p className="text-xs opacity-70">
+                Your key and request go directly from your browser to Anthropic
+                - this app&apos;s servers never see them.
+              </p>
+            ) : aiProvider === "openai" ? (
+              <p className="text-xs opacity-70">
+                OpenAI&apos;s API doesn&apos;t allow direct browser requests (a
+                limitation on their end, not ours), so this one request passes
+                through our server to relay it - it&apos;s never logged or
+                stored, and discarded immediately after the response.
+              </p>
+            ) : (
+              <p className="text-xs opacity-70">
+                We don&apos;t know whether this endpoint supports direct browser
+                requests, so this one request passes through our server to relay
+                it - it&apos;s never logged or stored, and discarded immediately
+                after the response.
+              </p>
+            )}
             <div>
               <label
                 className="block text-sm font-medium mb-1"
