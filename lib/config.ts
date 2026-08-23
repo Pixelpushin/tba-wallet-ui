@@ -4,11 +4,11 @@
 // hardcoded in the component or lib code itself, so this whole repo can be
 // pointed at a different project just by changing .env.local.
 //
-// getConfig() is called at request/render time inside Server Components
-// and API routes (never at module load time), so `next build` succeeds
-// even with no env vars set - pages that need it are marked
-// `export const dynamic = "force-dynamic"` and only actually read env vars
-// once a real request comes in.
+// getConfig() is called at request/render time inside Server Components,
+// Client Components, and API routes (never at module load time), so
+// `next build` succeeds even with no env vars set - pages that need it are
+// marked `export const dynamic = "force-dynamic"` and only actually read
+// env vars once a real request comes in.
 
 export interface TbaWalletConfig {
   tokenContract: string;
@@ -27,14 +27,42 @@ function readEnv(name: string): string | undefined {
   return value && value.trim().length > 0 ? value.trim() : undefined;
 }
 
+// Same-origin path that app/api/rpc/route.ts listens on. Every browser-side
+// caller (lib/chainReads.ts, lib/txBuilders.ts via @pixelpushin/tba-kit,
+// lib/appkit.ts's Reown chain config) resolves to this proxy instead of the
+// real upstream RPC endpoint.
+const CLIENT_RPC_PROXY_PATH = "/api/rpc";
+
+// Deliberately NOT read via NEXT_PUBLIC_ - RPC_URL commonly bakes in a
+// billable API key (e.g. https://<network>.g.alchemy.com/v2/<key>). A
+// NEXT_PUBLIC_ var gets inlined verbatim into the client JS bundle at build
+// time, which would let anyone view-source the key and run up charges on
+// whoever's account funds it (see README.md / .env.example). Reading this
+// as a bare env var means webpack/turbopack never inlines it into client
+// bundles, and in the browser `process.env.RPC_URL` is simply `undefined` -
+// so this branch only ever resolves on the server. Client code instead
+// gets a same-origin path to the proxy in app/api/rpc/route.ts, which reads
+// this same server-only var and forwards the request upstream.
+function resolveRpcUrl(): string {
+  if (typeof window !== "undefined") {
+    return `${window.location.origin}${CLIENT_RPC_PROXY_PATH}`;
+  }
+  const rpcUrl = readEnv("RPC_URL");
+  if (!rpcUrl) {
+    throw new ConfigError(
+      "Missing required environment variable: RPC_URL. " +
+        "Copy .env.example to .env.local, fill it in, and restart the dev server.",
+    );
+  }
+  return rpcUrl;
+}
+
 export function getConfig(): TbaWalletConfig {
   const tokenContract = readEnv("NEXT_PUBLIC_TOKEN_CONTRACT");
-  const rpcUrl = readEnv("NEXT_PUBLIC_RPC_URL");
   const chainIdRaw = readEnv("NEXT_PUBLIC_CHAIN_ID");
 
   const missing = [
     !tokenContract && "NEXT_PUBLIC_TOKEN_CONTRACT",
-    !rpcUrl && "NEXT_PUBLIC_RPC_URL",
     !chainIdRaw && "NEXT_PUBLIC_CHAIN_ID",
   ].filter(Boolean);
 
@@ -54,7 +82,7 @@ export function getConfig(): TbaWalletConfig {
 
   return {
     tokenContract: tokenContract as string,
-    rpcUrl: rpcUrl as string,
+    rpcUrl: resolveRpcUrl(),
     chainId,
     chainIdHex: `0x${chainId.toString(16)}`,
     chainName: readEnv("NEXT_PUBLIC_CHAIN_NAME") ?? `Chain ${chainId}`,

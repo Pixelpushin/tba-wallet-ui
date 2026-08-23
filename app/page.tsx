@@ -50,14 +50,20 @@ export default function Home() {
           </li>
           <li>
             <span className="text-neutral-300">
-              Set <code className="text-neutral-300">NEXT_PUBLIC_RPC_URL</code>.
+              Set <code className="text-neutral-300">RPC_URL</code>.
             </span>{" "}
             An &quot;RPC URL&quot; is a web address this app uses to talk to the
             blockchain, so it can read balances and send transactions. You need
             one before the app will work. To get one for free, make a free
             account at Alchemy (alchemy.com) or Infura (infura.io), then copy
             the RPC URL they give you for your chain. Some chains also have a
-            free public RPC URL that needs no signup.
+            free public RPC URL that needs no signup. This one is deliberately
+            NOT prefixed with{" "}
+            <code className="text-neutral-300">NEXT_PUBLIC_</code> - real RPC
+            URLs usually bake in a billable API key, and the app keeps it
+            server-side only (see{" "}
+            <code className="text-neutral-300">app/api/rpc/route.ts</code>) so
+            it never ships to the browser.
           </li>
           <li>
             <span className="text-neutral-300">
