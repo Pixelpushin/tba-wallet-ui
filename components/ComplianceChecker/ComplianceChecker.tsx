@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import type { ChainKey, ComplianceReport } from "@/lib/complianceCheck";
 import {
   explainFindingsAnthropicDirect,
@@ -29,8 +30,14 @@ const AI_PROVIDER_OPTIONS: { key: AiProviderKind; label: string }[] = [
 type Status = "idle" | "checking" | "done" | "error";
 
 export function ComplianceChecker() {
+  // Homepage's "Check a contract" quick-launch field links here as
+  // /checker?contract=0x... to prefill this same form field - no separate
+  // input mechanism, just a shortcut into the one this page already has.
+  const searchParams = useSearchParams();
   const [chainKey, setChainKey] = useState<ChainKey>("ethereum");
-  const [tokenContract, setTokenContract] = useState("");
+  const [tokenContract, setTokenContract] = useState(
+    () => searchParams.get("contract") ?? "",
+  );
   const [tokenId, setTokenId] = useState("");
   const [claimedTbaAddress, setClaimedTbaAddress] = useState("");
   const [implementationOverride, setImplementationOverride] = useState("");

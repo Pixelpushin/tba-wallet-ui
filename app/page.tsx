@@ -1,6 +1,60 @@
 import Link from "next/link";
+import { getConfig } from "@/lib/config";
+import { WalletDemo } from "@/components/WalletDemo";
+import { QuickLinks } from "@/components/QuickLinks";
+import { SetupGuide } from "@/components/SetupGuide";
+
+export const dynamic = "force-dynamic";
+
+// Default token ID shown as the live wallet example on this homepage - not
+// special, just a starting point. Visitors can use the "Open a wallet"
+// field in QuickLinks to jump to any other token ID in the collection.
+const DEMO_TOKEN_ID = "1";
 
 export default function Home() {
+  let config;
+  try {
+    config = getConfig();
+  } catch {
+    config = null;
+  }
+
+  // Configured deployment (e.g. tools.hoodchan.org): this instance already
+  // points at a real NFT collection, so show the real, usable tools right
+  // here instead of instructions for setting up something that's already
+  // set up. Un-configured template clones (someone ran `git clone` and
+  // hasn't filled in .env.local yet) fall through to the setup guide below.
+  if (config) {
+    return (
+      <main className="mx-auto flex min-h-screen max-w-2xl flex-col gap-6 px-6 py-10">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold">TBA Wallet UI</h1>
+            <p className="mt-1 text-sm text-neutral-400">
+              Live tools for {config.chainName} Token Bound Accounts: open any
+              wallet in this collection, or check any contract&apos;s TBA setup.
+            </p>
+          </div>
+          <Link
+            href="/setup"
+            className="shrink-0 text-xs text-neutral-500 hover:underline"
+          >
+            How to use this in your own project →
+          </Link>
+        </div>
+
+        <QuickLinks defaultTokenId={DEMO_TOKEN_ID} />
+
+        <div className="flex flex-col gap-4 border-t border-neutral-800 pt-6">
+          <h2 className="text-sm font-semibold text-neutral-200">
+            Live example: token #{DEMO_TOKEN_ID}
+          </h2>
+          <WalletDemo tokenId={DEMO_TOKEN_ID} config={config} />
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="mx-auto flex min-h-screen max-w-xl flex-col items-center gap-8 px-6 py-16 text-center">
       <div className="flex flex-col items-center gap-4">
@@ -15,89 +69,7 @@ export default function Home() {
         </p>
       </div>
 
-      <div className="w-full rounded-xl border border-neutral-800 bg-neutral-950 p-5 text-left">
-        <h2 className="mb-3 text-sm font-semibold text-neutral-200">
-          Setup: 5 steps
-        </h2>
-        <ol className="list-decimal space-y-4 pl-5 text-sm text-neutral-400">
-          <li>
-            <span className="text-neutral-300">
-              Copy the example settings file.
-            </span>{" "}
-            Open a terminal in this project folder and run this command:
-            <pre className="mt-1 overflow-x-auto rounded-md bg-neutral-900 px-3 py-2 text-xs text-neutral-300">
-              cp .env.example .env.local
-            </pre>
-            This creates a new file,{" "}
-            <code className="text-neutral-300">.env.local</code>, for your own
-            settings. It is not shared with anyone else.
-          </li>
-          <li>
-            <span className="text-neutral-300">
-              Set{" "}
-              <code className="text-neutral-300">
-                NEXT_PUBLIC_TOKEN_CONTRACT
-              </code>
-              .
-            </span>{" "}
-            This is the address of your own NFT collection (an ERC-721 contract)
-            - the one you want this wallet UI to work with. It is a long string
-            of letters and numbers starting with{" "}
-            <code className="text-neutral-300">0x</code>, for example:{" "}
-            <code className="text-neutral-300">
-              0xAbC1230000000000000000000000000000dEf9
-            </code>
-          </li>
-          <li>
-            <span className="text-neutral-300">
-              Set <code className="text-neutral-300">RPC_URL</code>.
-            </span>{" "}
-            An &quot;RPC URL&quot; is a web address this app uses to talk to the
-            blockchain, so it can read balances and send transactions. You need
-            one before the app will work. To get one for free, make a free
-            account at Alchemy (alchemy.com) or Infura (infura.io), then copy
-            the RPC URL they give you for your chain. Some chains also have a
-            free public RPC URL that needs no signup. This one is deliberately
-            NOT prefixed with{" "}
-            <code className="text-neutral-300">NEXT_PUBLIC_</code> - real RPC
-            URLs usually bake in a billable API key, and the app keeps it
-            server-side only (see{" "}
-            <code className="text-neutral-300">app/api/rpc/route.ts</code>) so
-            it never ships to the browser.
-          </li>
-          <li>
-            <span className="text-neutral-300">
-              Set <code className="text-neutral-300">NEXT_PUBLIC_CHAIN_ID</code>
-              .
-            </span>{" "}
-            This is a number that tells the app which blockchain to use. For
-            example, <code className="text-neutral-300">1</code> means Ethereum
-            mainnet, and <code className="text-neutral-300">8453</code> means
-            Base. If you do not know the number for your chain, look it up at
-            chainlist.org.
-          </li>
-          <li>
-            <span className="text-neutral-300">
-              Restart the app, then open a wallet page.
-            </span>{" "}
-            Save the file. Stop the running server (press{" "}
-            <code className="text-neutral-300">Ctrl+C</code> in the terminal)
-            and start it again:
-            <pre className="mt-1 overflow-x-auto rounded-md bg-neutral-900 px-3 py-2 text-xs text-neutral-300">
-              npm run dev
-            </pre>
-            Then, in your browser, go to{" "}
-            <code className="text-neutral-300">/wallet/&lt;tokenId&gt;</code>.
-            Replace <code className="text-neutral-300">&lt;tokenId&gt;</code>{" "}
-            with the ID number of one real NFT from your collection. For
-            example, if you own NFT #1, go to{" "}
-            <code className="text-neutral-300">/wallet/1</code>. The{" "}
-            <code className="text-neutral-300">1</code> here is just an example
-            number, not a fixed or special value - use whatever token ID your
-            own NFT has.
-          </li>
-        </ol>
-      </div>
+      <SetupGuide />
 
       <Link
         href="/wallet/1"

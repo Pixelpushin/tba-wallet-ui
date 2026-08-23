@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { ComplianceChecker } from "@/components/ComplianceChecker";
 
 // Standalone route for the TBA Compliance Checker - intentionally separate
@@ -10,10 +11,20 @@ export const metadata = {
     "Check whether an NFT collection's ERC-6551 Token Bound Account setup uses the canonical Tokenbound reference implementation or a custom one.",
 };
 
+// Forces per-request rendering instead of a build-time static shell, so a
+// visitor arriving via /checker?contract=0x... (from the homepage's "Check
+// a contract" quick-launch field) gets the prefilled form in the initial
+// HTML response, not just after client-side hydration.
+export const dynamic = "force-dynamic";
+
 export default function CheckerPage() {
   return (
     <main className="px-6 py-12">
-      <ComplianceChecker />
+      {/* ComplianceChecker reads ?contract= via useSearchParams, which
+          requires a Suspense boundary for prerendering to succeed. */}
+      <Suspense fallback={null}>
+        <ComplianceChecker />
+      </Suspense>
     </main>
   );
 }
