@@ -1,0 +1,33 @@
+{
+  "name": "tba-wallet-ui",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "description": "A pre-built, drop-in React UI for letting ERC-721 holders activate and use their ERC-6551 Token Bound Accounts: activate, send ETH, send ERC-20s, send NFTs (single + bulk), with ENS support.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@pixelpushin/tba-kit": "github:Pixelpushin/tba-kit",
+    "@reown/appkit": "^1.8.23",
+    "@reown/appkit-adapter-ethers": "^1.8.23",
+    "ethers": "^6.17.0",
+    "next": "^15.5.4",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "^15.5.4",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}
