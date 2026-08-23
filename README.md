@@ -64,23 +64,25 @@ Fill in `.env.local`:
 
 | Variable | Required | What it is |
 | --- | --- | --- |
-| `NEXT_PUBLIC_TOKEN_CONTRACT` | yes | The ERC-721 collection address this UI is gated to |
-| `NEXT_PUBLIC_RPC_URL` | yes | JSON-RPC URL for the chain that collection lives on |
-| `NEXT_PUBLIC_CHAIN_ID` | yes | Decimal chain ID (e.g. `1`, `8453`, `137`) |
+| `NEXT_PUBLIC_TOKEN_CONTRACT` | yes | The address of your own NFT collection (an ERC-721 contract) - this is the collection the wallet UI is gated to. It is a string starting with `0x`, e.g. `0xAbC1230000000000000000000000000000dEf9` |
+| `NEXT_PUBLIC_RPC_URL` | yes | The "RPC URL" for the chain your collection lives on - this is the web address the app uses to talk to the blockchain (read balances, send transactions). Get a free one from an [Alchemy](https://alchemy.com) or [Infura](https://infura.io) account, or use a free public RPC if your chain has one (see `.env.example` for a working default on Ethereum mainnet) |
+| `NEXT_PUBLIC_CHAIN_ID` | yes | The chain's numeric ID as a plain decimal number (e.g. `1` for Ethereum mainnet, `8453` for Base, `137` for Polygon). If you don't know your chain's number, look it up at [chainlist.org](https://chainlist.org) |
 | `NEXT_PUBLIC_REOWN_PROJECT_ID` | yes | Free WalletConnect/Reown Cloud project ID ([cloud.reown.com](https://cloud.reown.com)) |
 | `NEXT_PUBLIC_CHAIN_NAME` | no | Display name for the chain (defaults to `Chain <id>`) |
 | `NEXT_PUBLIC_BLOCK_EXPLORER_URL` | no | Used for "view transaction" / address links (defaults to Etherscan) |
 | `ALCHEMY_API_KEY` | no | Enables full ERC-20 + NFT holdings listing via Alchemy. Without it, the demo still works for ETH activate/send, it just has no tokens/NFTs to list |
 | `ENS_RPC_URL` | no | Mainnet RPC used for ENS name resolution (defaults to a public provider) |
 
-Then:
+Then start the dev server:
 
 ```bash
 npm run dev
 ```
 
-Open `http://localhost:3000/wallet/<tokenId>` for any token ID in your
-configured collection.
+Open `http://localhost:3000/wallet/<tokenId>` in your browser, replacing
+`<tokenId>` with the ID number of one real NFT you already own (or want to
+test) in your configured collection. For example, `<tokenId>` = `1` means
+NFT #1 - that "1" is just an example, not a fixed or required value.
 
 ## Using the component in your own app
 
